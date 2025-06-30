@@ -11,21 +11,21 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('posts', function (Blueprint $table) {
+        Schema::create('comments', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('userId');
-            $table->string('title');
+            $table->unsignedBigInteger('postId'); // foreign key
+            $table->string('name');
+            $table->string('email');
             $table->text('body');
             $table->timestamps();
+
+            // Foreign key constraint
+            $table->foreign('postId')->references('id')->on('posts')->onDelete('cascade');
         });
     }
 
-
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
-        Schema::dropIfExists('posts');
+        Schema::dropIfExists('comments');
     }
 };
