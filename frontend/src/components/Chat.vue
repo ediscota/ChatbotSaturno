@@ -22,7 +22,10 @@
     </div>
   </div>
 </template>
+
 <script>
+
+import { OPEN_AI_KEY } from '../env.js';
 export default {
   data() {
     return {
@@ -34,41 +37,113 @@ export default {
   methods: {
     async sendMessage() {
       if (!this.userInput.trim()) return;
-
-      // Aggiungi messaggio utente
       this.messages.push({ role: 'user', content: this.userInput });
-      const userMessage = this.userInput;
       this.userInput = '';
       this.loading = true;
 
       this.scrollToBottom();
 
       try {
-        // Chiamata API OpenAI
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer LA_TUA_API_KEY`
+            'Authorization': `Bearer ${OPEN_AI_KEY}`
           },
           body: JSON.stringify({
-            model: 'gpt-3.5-turbo',
-            messages: this.messages.map(m => ({ role: m.role, content: m.content }))
+            model: 'gpt-4o',
+            messages: this.messages.map(m => ({ role: m.role, content: m.content })),
+            tools: [
+              {
+                type: "function",
+                function: {
+                  name: "get_database_value",
+                  description: "Ottieni dati specifici dal database.",
+                  parameters: {
+                    type: "object",
+                    properties: {
+                      query: {
+                        type: "string",
+                        description: "La query SQL da eseguire oppure una descrizione in linguaggio naturale dell'informazione richiesta."
+                      }
+                    },
+                    required: ["query"]
+                  }
+                }
+              }
+            ],
+            tool_choice: "auto"
           })
         });
 
         const data = await response.json();
-        const aiReply = data.choices[0].message.content;
 
-        // Aggiungi messaggio AI
-        this.messages.push({ role: 'assistant', content: aiReply });
-        this.scrollToBottom();
+        const message = data.choices[0].message;
+
+        // Caso 1: risposta diretta
+        if (message.content) {
+          this.messages.push({ role: 'assistant', content: message.content });
+          this.scrollToBottom();
+        }
+        // Caso 2: chiamata al tool
+        else if (message.tool_calls && message.tool_calls.length > 0) {
+          const toolCall = message.tool_calls[0];
+          const toolArguments = JSON.parse(toolCall.function.arguments);
+
+          // Chiamata al backend Laravel per eseguire la query
+          const backendResponse = await fetch('http://localhost:8000/api/query', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ query: toolArguments.query })
+          });
+
+          const backendData = await backendResponse.json();
+          const toolResult = backendData.result; // <-- Assumiamo che il backend risponda con { result: '...' }
+
+          // Passa il risultato al modello
+          const secondResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer LA_TUA_API_KEY`
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o',
+              messages: [
+                ...this.messages,
+                { role: 'assistant', tool_calls: [toolCall] },
+                { role: 'tool', tool_call_id: toolCall.id, content: toolResult }
+              ]
+            })
+          });
+
+          const secondData = await secondResponse.json();
+          const aiFinalReply = secondData.choices[0].message.content;
+
+          this.messages.push({ role: 'assistant', content: aiFinalReply });
+          this.scrollToBottom();
+        }
       } catch (error) {
-        console.error('Errore nella chiamata OpenAI:', error);
+        console.error('Errore nella chiamata OpenAI o al backend:', error);
       } finally {
         this.loading = false;
       }
     },
+
+    //per modularizzare e scalare i tool
+    async getDatabaseValue(query) {
+      const response = await fetch('http://localhost:8000/api/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query }),
+      });
+      const data = await response.json();
+      return data.result;
+    },
+
+
     scrollToBottom() {
       this.$nextTick(() => {
         const chatWindow = this.$refs.chatWindow;
