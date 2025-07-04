@@ -40,10 +40,8 @@ export default {
       this.messages.push({ role: 'user', content: this.userInput });
       this.userInput = '';
       this.loading = true;
-
       this.scrollToBottom();
-
-      try {
+        //invia messaggio a server OpenAI
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -75,11 +73,8 @@ export default {
             tool_choice: "auto"
           })
         });
-
         const data = await response.json();
-
         const message = data.choices[0].message;
-
         // Caso 1: risposta diretta
         if (message.content) {
           this.messages.push({ role: 'assistant', content: message.content });
@@ -89,8 +84,8 @@ export default {
         else if (message.tool_calls && message.tool_calls.length > 0) {
           const toolCall = message.tool_calls[0];
           const toolArguments = JSON.parse(toolCall.function.arguments);
-
-          // Chiamata al backend Laravel per eseguire la query
+          //Chiamata al backend Laravel per eseguire la query
+          //if toolCall = "get_database_value"
           const backendResponse = await fetch('http://localhost/ChatbotSaturno/backend/public/api/query', {
             method: 'POST',
             headers: {
@@ -98,11 +93,9 @@ export default {
             },
             body: JSON.stringify({ query: toolArguments.query })
           });
-
           const backendData = await backendResponse.json();
           const toolResult = JSON.stringify(backendData.result);
-
-          // Passa il risultato al modello
+          //Passa il risultato della query al backend per "umanizzare" il messaggio
           const secondResponse = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
@@ -118,37 +111,16 @@ export default {
               ]
             })
           });
-
           const secondData = await secondResponse.json();
           const aiFinalReply = secondData.choices[0].message.content;
-
           this.messages.push({ role: 'assistant', content: aiFinalReply });
           this.scrollToBottom();
         }
-      } catch (error) {
-        console.error('Errore nella chiamata OpenAI o al backend:', error);
-      } finally {
         this.loading = false;
-      }
     },
-
-    //per modularizzare e scalare i tool
-    async getDatabaseValue(query) {
-      const response = await fetch('http://localhost:8000/api/query', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query }),
-      });
-      const data = await response.json();
-      return data.result;
-    },
-
 
     scrollToBottom() {
-      this.$nextTick(() => {
-        const chatWindow = this.$refs.chatWindow;
-        chatWindow.scrollTop = chatWindow.scrollHeight;
-      });
+      this.$nextTick(() => { const chatWindow = this.$refs.chatWindow;chatWindow.scrollTop = chatWindow.scrollHeight; });
     }
   }
 }
