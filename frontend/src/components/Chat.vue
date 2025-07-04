@@ -91,7 +91,7 @@ export default {
           const toolArguments = JSON.parse(toolCall.function.arguments);
 
           // Chiamata al backend Laravel per eseguire la query
-          const backendResponse = await fetch('http://localhost:8000/api/query', {
+          const backendResponse = await fetch('http://localhost/ChatbotSaturno/backend/public/api/query', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json'
@@ -100,14 +100,14 @@ export default {
           });
 
           const backendData = await backendResponse.json();
-          const toolResult = backendData.result; // <-- Assumiamo che il backend risponda con { result: '...' }
+          const toolResult = JSON.stringify(backendData.result);
 
           // Passa il risultato al modello
           const secondResponse = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer LA_TUA_API_KEY`
+              'Authorization': `Bearer ${OPEN_AI_KEY}`
             },
             body: JSON.stringify({
               model: 'gpt-4o',

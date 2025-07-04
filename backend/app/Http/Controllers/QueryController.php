@@ -9,9 +9,13 @@ class QueryController extends Controller
 {
     public function execute(Request $request)
     {
-        // fai poi in modo che non puoi eseguire delete ecc
         $query = $request->input('query');
-        $result = DB::select($query);
-        return response()->json(['result' => $result]);
+
+        try {
+            $result = DB::select($query);
+            return response()->json(['result' => $result]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 400);
+        }
     }
 }
