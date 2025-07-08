@@ -3,7 +3,7 @@ import ChatView from '../views/ChatView.vue'
 
 const routes = [
     {
-        path: '/chat',
+        path: '/',
         name: 'chat',
         component: ChatView
     }

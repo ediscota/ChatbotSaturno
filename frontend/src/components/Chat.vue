@@ -45,7 +45,7 @@
 </template>
 
 <script>
-
+import { sendMessageToOpenAI, getQueryResult, sendQueryToOpenAI } from '@/services/openaiService.js';
 import { OPEN_AI_KEY } from '../env.js';
 export default {
   data() {
@@ -54,7 +54,9 @@ export default {
       //prompt engineering
       systemPrompt: {
         role: 'system',
-        content: `\`Sei un assistente SQL che genera query solo sulla base della seguente struttura del database. Usa sempre i nomi delle tabelle e delle colonne esattamente come indicati qui:
+        content: `\`Sei un assistente SQL, (l'utilizzatore finale non sa nulla di programmazione quindi non far riferimento a sql, database o altro di tecnico)
+        che genera query solo sulla base della seguente struttura del database.
+        Usa sempre i nomi delle tabelle e delle colonne esattamente come indicati qui:
           - Tabella: users
             - Colonne: id, name, username, email, phone, website, created_at, updated_at
           - Tabella: posts
@@ -72,89 +74,33 @@ export default {
     }
   },
   methods: {
-    async sendMessage() {
-      if (!this.userInput.trim()) return;
-      this.messages.push({ role: 'user', content: this.userInput });
-      this.userInput = '';
-      this.loading = true;
+
+  async sendMessage() {
+    if (!this.userInput.trim()) return;
+    this.messages.push({ role: 'user', content: this.userInput });
+    this.userInput = '';
+    this.loading = true;
+    this.scrollToBottom();
+
+    const data = await sendMessageToOpenAI(this.systemPrompt, this.messages);
+    const message = data.choices[0].message;
+    //risposta diretta
+    if (message.content) {
+      this.messages.push({ role: 'assistant', content: message.content });
       this.scrollToBottom();
-        //invia messaggio a server OpenAI
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${OPEN_AI_KEY}`
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o',
-            messages: [
-              this.systemPrompt,
-              ...this.messages.map(m => ({ role: m.role, content: m.content }))
-            ],
-            tools: [
-              {
-                type: "function",
-                function: {
-                  name: "get_database_value",
-                  description: "Ottieni dati specifici dal database.",
-                  parameters: {
-                    type: "object",
-                    properties: {
-                      query: {
-                        type: "string",
-                        description: "La query SQL da eseguire oppure una descrizione in linguaggio naturale dell'informazione richiesta."
-                      }
-                    },
-                    required: ["query"]
-                  }
-                }
-              }
-            ],
-            tool_choice: "auto"
-          })
-        });
-        const data = await response.json();
-        const message = data.choices[0].message;
-        //risposta diretta
-        if (message.content) {
-          this.messages.push({ role: 'assistant', content: message.content });
-          this.scrollToBottom();
-        }
-        //chiamata al tool
-        else if (message.tool_calls && message.tool_calls.length > 0) {
-          const toolCall = message.tool_calls[0];
-          const toolArguments = JSON.parse(toolCall.function.arguments);
-          const backendResponse = await fetch('http://localhost/ChatbotSaturno/backend/public/api/query', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ query: toolArguments.query })
-          });
-          const backendData = await backendResponse.json();
-          const toolResult = JSON.stringify(backendData.result);
-          //Passa il risultato della query al server opneai per "umanizzare" il messaggio
-          const secondResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${OPEN_AI_KEY}`
-            },
-            body: JSON.stringify({
-              model: 'gpt-4o',
-              messages: [
-                ...this.messages,
-                { role: 'assistant', tool_calls: [toolCall] },
-                { role: 'tool', tool_call_id: toolCall.id, content: toolResult }
-              ]
-            })
-          });
-          const secondData = await secondResponse.json();
-          const aiFinalReply = secondData.choices[0].message.content;
-          this.messages.push({ role: 'assistant', content: aiFinalReply });
-          this.scrollToBottom();
-        }
-        this.loading = false;
+    }
+    //manda a backend laravel per fare query
+    else if (message.tool_calls && message.tool_calls.length > 0) {
+      const tool = message.tool_calls[0];
+      const toolArguments = JSON.parse(tool.function.arguments);
+      const queryResult = await getQueryResult(toolArguments.query);
+      const queryJson = JSON.stringify(queryResult.result);
+      const newData = await sendQueryToOpenAI(this.messages, tool, queryJson);
+      const aiFinalReply = newData.choices[0].message.content;
+      this.messages.push({ role: 'assistant', content: aiFinalReply });
+      this.scrollToBottom();
+      }
+    this.loading = false;
     },
 
     scrollToBottom() {
@@ -171,7 +117,7 @@ export default {
   flex-direction: column;
   height: 100vh;
   width: 100vw;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #000000 0%, #252525 100%);
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   position: fixed;
   top: 0;
@@ -328,12 +274,12 @@ export default {
 .send-button {
   width: 45px;
   height: 45px;
-  border: none;
-  border-radius: 50%;
-  background: linear-gradient(45deg, #4facfe 0%, #00f2fe 100%);
-  color: white;
+  border: black;
+  border-radius: 100%;
+  background: linear-gradient(45deg, #ffffff 0%, #ffffff 100%);
+  color: #454545;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.4s ease;
   display: flex;
   align-items: center;
   justify-content: center;
