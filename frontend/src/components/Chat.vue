@@ -47,14 +47,7 @@
 <script>
 import { sendMessageToOpenAI, getQueryResult, sendQueryToOpenAI } from '@/services/openaiService.js';
 import { OPEN_AI_KEY } from '../env.js';
-export default {
-  data() {
-    return {
-      userInput: '',
-      //prompt engineering
-      systemPrompt: {
-        role: 'system',
-        content: `\`Sei un assistente SQL, (l'utilizzatore finale non sa nulla di programmazione quindi non far riferimento a sql, database o altro di tecnico)
+const prompt = `\`Sei un assistente SQL, (l'utilizzatore finale non sa nulla di programmazione quindi non far riferimento a sql, database o altro di tecnico)
         che genera query solo sulla base della seguente struttura del database.
         Usa sempre i nomi delle tabelle e delle colonne esattamente come indicati qui:
           - Tabella: users
@@ -68,6 +61,14 @@ export default {
           - Usa sempre i nomi in inglese delle tabelle e delle colonne anche se l'utente usa termini diversi o sinonimi.
           - Se l'utente chiede i post di un utente, collegali tramite posts.userId = users.id.
           - Se l'utente chiede i commenti di un post, collegali tramite comments.postId = posts.id.\``
+export default {
+  data() {
+    return {
+      userInput: '',
+      //prompt engineering
+      systemPrompt: {
+        role: 'system',
+        content: prompt
       },
       messages: [],
       loading: false
