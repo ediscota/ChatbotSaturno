@@ -65,50 +65,124 @@ export default {
   data() {
     return {
       userInput: '',
-      //prompt engineering
+      // prompt engineering
       systemPrompt: {
         role: 'system',
         content: prompt
       },
       messages: [],
       loading: false
-    }
+    };
   },
+
+  async beforeMount() {
+    await this.fetchChats(); // assicura che venga caricata anche la chatId
+  },
+
   methods: {
+    async fetchChats() {
+      const response = await fetch('http://localhost/ChatbotSaturno/backend/public/api/chats');
+      const data = await response.json();
+      const chat = data.chats[0]; // Attualmente solo una chat
+      this.setChat(chat.id); // Salva in Vuex
+      this.fetchMessages(chat.id);
+    },
 
-  async sendMessage() {
-    if (!this.userInput.trim()) return;
-    this.messages.push({ role: 'user', content: this.userInput });
-    this.userInput = '';
-    this.loading = true;
-    this.scrollToBottom();
+    async fetchMessages(chatId) {
+      const res = await fetch(`http://localhost/ChatbotSaturno/backend/public/api/chats/1/messages`);
+      const data = await res.json();
+      this.messages = data.messages;
+    },
 
-    const data = await sendMessageToOpenAI(this.systemPrompt, this.messages);
-    const message = data.choices[0].message;
-    //risposta diretta
-    if (message.content) {
-      this.messages.push({ role: 'assistant', content: message.content });
+    async sendMessage() {
+      if (!this.userInput.trim()) return;
+
+      const userMessage = { role: 'user', content: this.userInput };
+      const chatId = this.$store.getters.currentChatId;
+
+      // Salva messaggio utente su backend
+      await fetch('http://localhost/ChatbotSaturno/backend/public/api/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json' // 👈 fondamentale
+        },
+        body: JSON.stringify({
+          chat_id: 1,
+          role: 'user',
+          content: userMessage.content
+        })
+      });
+
+      this.messages.push(userMessage);
+      this.userInput = '';
+      this.loading = true;
       this.scrollToBottom();
-    }
-    //manda a backend laravel per fare query
-    else if (message.tool_calls && message.tool_calls.length > 0) {
-      const tool = message.tool_calls[0];
-      const toolArguments = JSON.parse(tool.function.arguments);
-      const queryResult = await getQueryResult(toolArguments.query);
-      const queryJson = JSON.stringify(queryResult.result);
-      const newData = await sendQueryToOpenAI(this.messages, tool, queryJson);
-      const aiFinalReply = newData.choices[0].message.content;
-      this.messages.push({ role: 'assistant', content: aiFinalReply });
-      this.scrollToBottom();
+
+      const data = await sendMessageToOpenAI(this.systemPrompt, this.messages);
+      const message = data.choices[0].message;
+
+      if (message.content) {
+        const assistantMessage = { role: 'assistant', content: message.content };
+        this.messages.push(assistantMessage);
+
+        // Salva messaggio assistente su backend
+        await fetch('http://localhost/ChatbotSaturno/backend/public/api/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json' // 👈 fondamentale
+          },
+          body: JSON.stringify({
+            chat_id: 1,
+            role: 'assistant',
+            content: assistantMessage.content
+          })
+        });
+
+        this.scrollToBottom();
+
+      } else if (message.tool_calls && message.tool_calls.length > 0) {
+        const tool = message.tool_calls[0];
+        const toolArguments = JSON.parse(tool.function.arguments);
+        const queryResult = await getQueryResult(toolArguments.query);
+        const queryJson = JSON.stringify(queryResult.result);
+
+        const newData = await sendQueryToOpenAI(this.messages, tool, queryJson);
+        const aiFinalReply = newData.choices[0].message.content;
+
+        const finalMessage = { role: 'assistant', content: aiFinalReply };
+        this.messages.push(finalMessage);
+
+        // Salva messaggio finale su backend
+        await fetch('http://localhost/ChatbotSaturno/backend/public/api/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json' // 👈 fondamentale
+          },
+          body: JSON.stringify({
+            chat_id: 1,
+            role: 'assistant',
+            content: finalMessage.content
+          })
+        });
+
+        this.scrollToBottom();
       }
-    this.loading = false;
+
+      this.loading = false;
     },
 
     scrollToBottom() {
-      this.$nextTick(() => { const chatWindow = this.$refs.chatWindow;chatWindow.scrollTop = chatWindow.scrollHeight; });
+      this.$nextTick(() => {
+        const chatWindow = this.$refs.chatWindow;
+        if (chatWindow) chatWindow.scrollTop = chatWindow.scrollHeight;
+      });
     }
   }
-}
+};
+
 </script>
 
 <style scoped>
