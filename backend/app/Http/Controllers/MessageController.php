@@ -10,9 +10,10 @@ class MessageController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index($chatId)
     {
-        return response()->json(['messages' => Message::orderBy('created_at')->get()]);
+        $messages = Message::where('chat_id', $chatId)->get();
+        return response()->json(['messages' => $messages]);
     }
 
     /**
@@ -28,7 +29,7 @@ class MessageController extends Controller
      */
     public function store(Request $request)
     {
-        $validated = $request->validate(['role' => 'required|in:user,assistant', 'content' => 'required|string']);
+        $validated = $request->validate(['chat_id' => 'required|exists:chats,id', 'role' => 'required|in:user,assistant', 'content' => 'required|string',]);
         $message = Message::create($validated);
         return response()->json(['message' => $message], 200);
     }

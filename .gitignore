@@ -1,2 +1,3 @@
 frontend/src/env.js
 frontend/.env
+backend/database/migrations/2025_07_09_141546_create_chats_table.php
