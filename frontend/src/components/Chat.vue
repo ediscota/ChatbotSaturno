@@ -76,36 +76,37 @@ export default {
   },
 
   async beforeMount() {
-    await this.fetchChats(); // assicura che venga caricata anche la chatId
+     await this.fetchChats().then((chatId)=>{
+       this.fetchMessages(chatId);
+     })
+    alert(chatId);
   },
 
   methods: {
     async fetchChats() {
       const response = await fetch('http://localhost/ChatbotSaturno/backend/public/api/chats');
       const data = await response.json();
-      const chat = data.chats[0]; // Attualmente solo una chat
-      this.setChat(chat.id); // Salva in Vuex
-      this.fetchMessages(chat.id);
+      const chat = data.chats[0];
+      //this.setChat(chat.id); da problemi questo, attualmente non ti serve salvarlo nella sessione quindi
+      return chat.id;
     },
 
     async fetchMessages(chatId) {
-      const res = await fetch(`http://localhost/ChatbotSaturno/backend/public/api/chats/1/messages`);
+      const res = await fetch(`http://localhost/ChatbotSaturno/backend/public/api/chats/${chatId}/messages`);
       const data = await res.json();
       this.messages = data.messages;
     },
 
     async sendMessage() {
       if (!this.userInput.trim()) return;
-
       const userMessage = { role: 'user', content: this.userInput };
       const chatId = this.$store.getters.currentChatId;
-
       // Salva messaggio utente su backend
       await fetch('http://localhost/ChatbotSaturno/backend/public/api/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json' // 👈 fondamentale
+          'Accept': 'application/json'
         },
         body: JSON.stringify({
           chat_id: 1,
@@ -131,7 +132,7 @@ export default {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Accept': 'application/json' // 👈 fondamentale
+            'Accept': 'application/json' //
           },
           body: JSON.stringify({
             chat_id: 1,
@@ -159,7 +160,7 @@ export default {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Accept': 'application/json' // 👈 fondamentale
+            'Accept': 'application/json' //
           },
           body: JSON.stringify({
             chat_id: 1,
