@@ -47,7 +47,7 @@
 <script>
 import { sendMessageToOpenAI, getQueryResult, sendQueryToOpenAI } from '@/services/openaiService.js';
 import { OPEN_AI_KEY } from '../env.js';
-const prompt = `\`Sei un assistente SQL, (l'utilizzatore finale non sa nulla di programmazione quindi non far riferimento a sql, database o altro di tecnico)
+const prompt = `\`Sei un assistente SQL, (l'utilizzatore finale non sa nulla di programmazione quindi non far riferimento a sql,database o altro di tecnico)
         che genera query solo sulla base della seguente struttura del database.
         Usa sempre i nomi delle tabelle e delle colonne esattamente come indicati qui:
           - Tabella: users
@@ -75,22 +75,28 @@ export default {
     };
   },
 
+  computed: {
+    currentChatId() {
+      return this.$store.state.currentChatId;
+    }
+  },
+
+  watch: {
+    currentChatId: {
+      handler(newId) {
+        if (newId) {
+          this.fetchMessages(newId);
+        }
+      }
+    }
+  },
+
   async beforeMount() {
-     await this.fetchChats().then((chatId)=>{
-       this.fetchMessages(chatId);
-     })
-    alert(chatId);
+    const chatId = this.$store.getters.currentChatId;
+    await this.fetchMessages(chatId);
   },
 
   methods: {
-    async fetchChats() {
-      const response = await fetch('http://localhost/ChatbotSaturno/backend/public/api/chats');
-      const data = await response.json();
-      const chat = data.chats[0];
-      //this.setChat(chat.id); da problemi questo, attualmente non ti serve salvarlo nella sessione quindi
-      return chat.id;
-    },
-
     async fetchMessages(chatId) {
       const res = await fetch(`http://localhost/ChatbotSaturno/backend/public/api/chats/${chatId}/messages`);
       const data = await res.json();
@@ -101,6 +107,7 @@ export default {
       if (!this.userInput.trim()) return;
       const userMessage = { role: 'user', content: this.userInput };
       const chatId = this.$store.getters.currentChatId;
+
       // Salva messaggio utente su backend
       await fetch('http://localhost/ChatbotSaturno/backend/public/api/messages', {
         method: 'POST',
@@ -109,7 +116,7 @@ export default {
           'Accept': 'application/json'
         },
         body: JSON.stringify({
-          chat_id: 1,
+          chat_id: chatId,
           role: 'user',
           content: userMessage.content
         })
@@ -118,7 +125,6 @@ export default {
       this.messages.push(userMessage);
       this.userInput = '';
       this.loading = true;
-      this.scrollToBottom();
 
       const data = await sendMessageToOpenAI(this.systemPrompt, this.messages);
       const message = data.choices[0].message;
@@ -132,16 +138,14 @@ export default {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Accept': 'application/json' //
+            'Accept': 'application/json'
           },
           body: JSON.stringify({
-            chat_id: 1,
+            chat_id: chatId,
             role: 'assistant',
             content: assistantMessage.content
           })
         });
-
-        this.scrollToBottom();
 
       } else if (message.tool_calls && message.tool_calls.length > 0) {
         const tool = message.tool_calls[0];
@@ -160,16 +164,14 @@ export default {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Accept': 'application/json' //
+            'Accept': 'application/json'
           },
           body: JSON.stringify({
-            chat_id: 1,
+            chat_id: chatId,
             role: 'assistant',
             content: finalMessage.content
           })
         });
-
-        this.scrollToBottom();
       }
 
       this.loading = false;
@@ -192,12 +194,9 @@ export default {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  width: 100vw;
+  flex: 1;
   background: linear-gradient(135deg, #000000 0%, #252525 100%);
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  position: fixed;
-  top: 0;
-  left: 0;
   margin: 0;
   padding: 0;
   box-sizing: border-box;
@@ -314,6 +313,7 @@ export default {
   background: rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(10px);
   border-top: 1px solid rgba(255, 255, 255, 0.2);
+  flex-shrink: 0; /* Impedisce al container di ridursi */
 }
 
 .input-wrapper {
@@ -406,15 +406,6 @@ export default {
   .message-content {
     max-width: 85%;
   }
-}
-* {
-  box-sizing: border-box;
-}
-
-body, html {
-  margin: 0;
-  padding: 0;
-  overflow-x: hidden;
 }
 </style>
 
