@@ -9,3 +9,4 @@ Route::post('/query', [QueryController::class, 'execute']);
 Route::get('/chats/{chat}/messages', [MessageController::class, 'index']);
 Route::post('/messages', [MessageController::class, 'store']);
 Route::get('/chats', [ChatController::class, 'index']);
+Route::post('/chats', [ChatController::class, 'store']);

@@ -106,9 +106,28 @@ export default {
     async sendMessage() {
       if (!this.userInput.trim()) return;
       const userMessage = { role: 'user', content: this.userInput };
-      const chatId = this.$store.getters.currentChatId;
+      let chatId = this.$store.getters.currentChatId;
+      // se chatId null (cioè appena apro la pagina), allora crea nuova chat e salvala nello stato,
+      // i nuovi messaggi apparterranno a questa nuova chat
+      if (!chatId) {
+        const response = await fetch('http://localhost/ChatbotSaturno/backend/public/api/chats', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            title: 'Nuova Chat'
+          })
+        });
+        //await fetch http://localhost/ChatbotSaturno/backend/public/api/chats
+        const data = await response.json();
+        chatId = data.chat.id;
+        await this.$store.dispatch('setChat', chatId);
+        this.$emit('chatCreated');
+      }
 
-      // Salva messaggio utente su backend
+      // Salva messaggio utente su DB
       await fetch('http://localhost/ChatbotSaturno/backend/public/api/messages', {
         method: 'POST',
         headers: {
@@ -123,17 +142,18 @@ export default {
       });
 
       this.messages.push(userMessage);
-      this.userInput = '';
+      this.userInput = ''; //azzera input in attesa del prox
       this.loading = true;
-
+      //manda messaggio a server openAI
       const data = await sendMessageToOpenAI(this.systemPrompt, this.messages);
       const message = data.choices[0].message;
 
+      //se openAI capisce di NON utilizzare tool, restituisci direttamente il messaggio
       if (message.content) {
         const assistantMessage = { role: 'assistant', content: message.content };
         this.messages.push(assistantMessage);
 
-        // Salva messaggio assistente su backend
+        //Salva messaggio AI su DB
         await fetch('http://localhost/ChatbotSaturno/backend/public/api/messages', {
           method: 'POST',
           headers: {
@@ -147,19 +167,19 @@ export default {
           })
         });
 
+      //se openAI capisce di utilizzare tool per fare query, manda il messaggio all'api laravel per fare query
       } else if (message.tool_calls && message.tool_calls.length > 0) {
-        const tool = message.tool_calls[0];
-        const toolArguments = JSON.parse(tool.function.arguments);
-        const queryResult = await getQueryResult(toolArguments.query);
+        const tool = message.tool_calls[0]; //tool che chiama
+        const toolArguments = JSON.parse(tool.function.arguments); //argomenti tool
+        const queryResult = await getQueryResult(toolArguments.query); //chiamata api
         const queryJson = JSON.stringify(queryResult.result);
-
+      //rimada il risultato della query al server OpenAI per umanizzare il messaggio
         const newData = await sendQueryToOpenAI(this.messages, tool, queryJson);
         const aiFinalReply = newData.choices[0].message.content;
-
         const finalMessage = { role: 'assistant', content: aiFinalReply };
         this.messages.push(finalMessage);
 
-        // Salva messaggio finale su backend
+        // Salva messaggio finale su DB
         await fetch('http://localhost/ChatbotSaturno/backend/public/api/messages', {
           method: 'POST',
           headers: {
@@ -173,7 +193,6 @@ export default {
           })
         });
       }
-
       this.loading = false;
     },
 

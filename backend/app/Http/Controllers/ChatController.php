@@ -13,6 +13,10 @@ class ChatController extends Controller
         return response()->json(['chats' => Chat::all()]);
     }
 
-    //implementa la post per creare altre chat in futuro
+    public function store(Request $request)
+    {
+        $chat = Chat::create(['title' => $request->input('title', 'Nuova Chat'),]);
+        return response()->json(['chat' => $chat], 200);
+    }
 
 }

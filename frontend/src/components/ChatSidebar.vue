@@ -6,6 +6,7 @@
           v-for="chat in chats"
           :key="chat.id"
           @click="selectChat(chat.id)"
+          :class="{ active: chat.id === currentChatId }"
       >
         {{ chat.title }}
       </li>
@@ -20,6 +21,12 @@ export default {
   data() {
     return {
       chats: []
+    }
+  },
+
+  computed: {
+    currentChatId() {
+      return this.$store.state.currentChatId;
     }
   },
 

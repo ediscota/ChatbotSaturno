@@ -1,7 +1,7 @@
 <template>
   <div class="chat-page">
-    <ChatSidebar />
-    <Chat />
+    <ChatSidebar ref="sidebar" />
+    <Chat @chatCreated="onChatCreated" />
   </div>
 </template>
 
@@ -14,6 +14,11 @@ export default {
   components: {
     Chat,
     ChatSidebar
+  },
+  methods: {
+    onChatCreated() {
+      this.$refs.sidebar.fetchChats();
+    }
   }
 }
 </script>
